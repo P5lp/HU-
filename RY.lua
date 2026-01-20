@@ -812,10 +812,6 @@ local function ChangeTheme(Theme)
 			end
 		end
 	end
-    	-- Update WindowIcon color when theme changes
-	if Topbar:FindFirstChild("WindowIcon") then
-		Topbar.WindowIcon.ImageColor3 = SelectedTheme.TextColor
-	end
 end
 
 local function getIcon(name : string): {id: number, imageRectSize: Vector2, imageRectOffset: Vector2}
@@ -1621,40 +1617,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	end
 	local Passthrough = false
 	Topbar.Title.Text = Settings.Name
-    	-- === Window Icon in Topbar (Left of Title) ===
-	local WindowIcon = Instance.new("ImageLabel")
-	WindowIcon.Name = "WindowIcon"
-	WindowIcon.Parent = Topbar
-	WindowIcon.BackgroundTransparency = 1
-	WindowIcon.Size = UDim2.new(0, 32, 0, 32)          -- حجم الأيقونة، غيّره لو تبي أكبر/أصغر
-	WindowIcon.Position = UDim2.new(0, 15, 0.5, 0)     -- المسافة من اليسار
-	WindowIcon.AnchorPoint = Vector2.new(0, 0.5)
-	WindowIcon.ImageTransparency = 1                  -- تبدأ مخفية للـ animation
-	WindowIcon.ImageColor3 = SelectedTheme.TextColor
-	WindowIcon.ZIndex = Topbar.Title.ZIndex + 1
-
-	if Settings.Icon then
-		if typeof(Settings.Icon) == "number" then
-			WindowIcon.Image = "rbxassetid://" .. Settings.Icon
-		elseif typeof(Settings.Icon) == "string" then
-			if Icons then
-				local asset = getIcon(Settings.Icon)
-				if asset then
-					WindowIcon.Image = "rbxassetid://" .. asset.id
-					WindowIcon.ImageRectSize = asset.imageRectSize
-					WindowIcon.ImageRectOffset = asset.imageRectOffset
-				end
-			else
-				WindowIcon.Image = Settings.Icon  -- لو URL مباشر (نادر)
-			end
-		end
-	else
-		WindowIcon.Visible = false
-	end
-
-	-- حرّك النص لليمين عشان يسيب مكان للأيقونة
-	Topbar.Title.Position = UDim2.new(0, 55, 0.5, 0)   -- 55 تقريباً حجم الأيقونة + مسافة
-	Topbar.Title.AnchorPoint = Vector2.new(0, 0.5)
 
 	Main.Size = UDim2.new(0, 420, 0, 100)
 	Main.Visible = true
@@ -3566,9 +3528,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 	task.wait(0.1)
 	TweenService:Create(Topbar.Divider, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Size = UDim2.new(1, 0, 0, 1)}):Play()
 	TweenService:Create(Topbar.Title, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-    	if Topbar:FindFirstChild("WindowIcon") then
-		TweenService:Create(Topbar.WindowIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-	end
 	task.wait(0.05)
 	TweenService:Create(Topbar.Search, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {ImageTransparency = 0.8}):Play()
 	task.wait(0.05)
