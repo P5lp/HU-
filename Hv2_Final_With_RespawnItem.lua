@@ -1,1076 +1,1100 @@
--- تحميل Rayfield UI
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
-
--- متغيرات عامة
-local player = game.Players.LocalPlayer
-local mouse = player:GetMouse()
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local Camera = game.Workspace.CurrentCamera
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+local camera = Workspace.CurrentCamera
 
--- متغيرات لتتبع حالة الأوامر
-local states = {
-    fly = {enabled = false, connection = nil, bodyVelocity = nil},
-    noclip = {enabled = false, connection = nil},
-    god = {enabled = false},
-    speed = {enabled = false, originalSpeed = 16},
-    jump = {enabled = false, originalJump = 50},
-    invisible = {enabled = false, clone = nil},
-    freeze = {enabled = false},
-    spectate = {enabled = false, connection = nil},
-    xray = {enabled = false},
-    esp = {enabled = false, highlights = {}}
-}
+-- متغيرات الحالة
+local selectedLocation = nil
+local selectedPlayer = nil
+local isOnCooldownLocations = false
+local isOnCooldownPlayers = false
+local cooldownTime = 9
 
--- متغير اللغة
-local language = nil
-local translations = {
-    Arabic = {
-        windowTitle = "🛠️ سكربت أوامر Infinite Yield",
-        loadingTitle = "جاري التحميل...",
-        loadingSubtitle = "By أنت 😎",
-        fly = "✈️ طيران",
-        noclip = "🚫 نوقليب",
-        speed = "🏃‍♂️ سرعة",
-        jump = "🦘 قفز عالي",
-        god = "💀 جود مود",
-        invisible = "👻 اختفاء",
-        freeze = "🧊 تجميد",
-        refresh = "♻️ تحديث الشخصية",
-        selectPlayer = "👤 اختر لاعب",
-        killPlayer = "🔫 قتل اللاعب المختار",
-        gotoPlayer = "🚀 الانتقال إلى اللاعب",
-        spectatePlayer = "👀 مراقبة اللاعب",
-        flingPlayer = "🚀 رمي اللاعب",
-        tooldrop = "🛠️ إسقاط الأدوات",
-        nuke = "💥 نوك",
-        rejoin = "🔄 إعادة الانضمام",
-        xray = "🔍 إكس راي",
-        esp = "🌟 إي إس بي",
-        customCommand = "🔤 أمر مخصص",
-        customPlaceholder = "مثال: speed 200 أو goto PlayerName",
-        resetAll = "🔄 إعادة تعيين جميع الأوامر",
-        closeUI = "🗑️ إغلاق الواجهة",
-        speedInput = "أدخل السرعة (مثال: 100)",
-        playerInput = "أدخل اسم اللاعب",
-        notifyOn = "تفعيل",
-        notifyOff = "إيقاف",
-        error = "❌ خطأ",
-        selectPlayerError = "يرجى اختيار لاعب أولاً",
-        playerNotFound = "لم يتم العثور على اللاعب أو شخصيته",
-        chooseLanguage = "اختر اللغة",
-        arabic = "العربية",
-        english = "الإنجليزية",
-        confirm = "تأكيد",
-        movementTab = "🏃 الحركة",
-        powersTab = "🧪 القدرات",
-        playersTab = "👥 اللاعبين",
-        customTab = "🛠️ أمر مخصص",
-        settingsTab = "⚙️ إعدادات عامة"
-    },
-    English = { -- ترجمة حرفية بنمط عربي-إنجليزي
-        windowTitle = "🛠️ Script Commands Infinite Yield",
-        loadingTitle = "Now Loading...",
-        loadingSubtitle = "By You 😎",
-        fly = "✈️ Activate Fly",
-        noclip = "🚫 Activate Noclip",
-        speed = "🏃‍♂️ Activate Speed",
-        jump = "🦘 Activate High Jump",
-        god = "💀 Activate God Mode",
-        invisible = "👻 Activate Disappear",
-        freeze = "🧊 Activate Freeze",
-        refresh = "♻️ Refresh My Character",
-        selectPlayer = "👤 Choose Player",
-        killPlayer = "🔫 Kill Chosen Player",
-        gotoPlayer = "🚀 Go To Player",
-        spectatePlayer = "👀 Watch Player",
-        flingPlayer = "🚀 Throw Player",
-        tooldrop = "🛠️ Drop My Tools",
-        nuke = "💥 Activate Nuke",
-        rejoin = "🔄 Rejoin Server",
-        xray = "🔍 Activate X-Ray",
-        esp = "🌟 Activate ESP",
-        customCommand = "🔤 Write Custom Command",
-        customPlaceholder = "Example: speed 200 or goto PlayerName",
-        resetAll = "🔄 Reset All Commands",
-        closeUI = "🗑️ Close The Interface",
-        speedInput = "Write Speed (Example: 100)",
-        playerInput = "Write Player Name",
-        notifyOn = "Activated",
-        notifyOff = "Deactivated",
-        error = "❌ Error Happened",
-        selectPlayerError = "Please Choose Player First",
-        playerNotFound = "Player Or His Character Not Found",
-        chooseLanguage = "Choose The Language",
-        arabic = "Arabic",
-        english = "English",
-        confirm = "Confirm",
-        movementTab = "🏃 Movement Section",
-        powersTab = "🧪 Powers Section",
-        playersTab = "👥 Players Section",
-        customTab = "🛠️ Custom Command Section",
-        settingsTab = "⚙️ General Settings"
-    }
-}
+-- إحداثيات Min (تم إرجاع موقع الدروب مع إضافة 90° للاستلقاء المسطح كما في البداية)
+local MinArmoryPos = CFrame.new(196, 23.23, -215)
+local MinSecretDropPos = CFrame.new(-3.63, 30.07, -57.13)
+local MinDropCFrame = MinSecretDropPos * CFrame.Angles(math.rad(90), 0, 0)
+local MinCamArmoryPos = CFrame.new(197.10, 24.68, -215.00)
+local MinCamDropPos = CFrame.new(-4.40027905, 28.6965332, -52.30336, 0.999962628, 0.00840886775, -0.00199508853, 0, 0.230851427, 0.972989082, 0.00864230469, -0.972952724, 0.230842814)
 
--- واجهة اختيار اللغة
-local function createLanguageUI()
-    local ScreenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-    ScreenGui.Name = "LanguageSelectionUI"
-    ScreenGui.ResetOnSpawn = false
+-- إحداثيات Max
+local MaxArmoryPos = CFrame.new(196, 23.23, -215)
+local MaxSecretDropPos = CFrame.new(86.40, 3.72, -123.01)
+local MaxDropCFrame = MaxSecretDropPos * CFrame.Angles(math.rad(90), 0, 0)
+local MaxCamArmoryPos = CFrame.new(197.10, 24.68, -215.00)
+local MaxCamDropPos = CFrame.new(87.8526535, -0.884054422, -138.253372, -0.999785066, -0.0151582891, 0.0141448993, 0, 0.682245076, 0.731123507, -0.0207328703, 0.730966389, -0.682098448)
 
-    local Frame = Instance.new("Frame", ScreenGui)
-    Frame.Size = UDim2.new(0, 350, 0, 200)
-    Frame.Position = UDim2.new(0.5, -175, 0.5, -100)
-    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    Frame.BorderSizePixel = 0
-    Frame.BackgroundTransparency = 0.1
+-- إحداثيات Booking
+local BookingDropCFrame = CFrame.new(190.80, 19.13, -155.41) * CFrame.Angles(-1.763, -0.006, -3.108)
+local BookingCamDropPos = CFrame.new(196.15538, 16.8420944, -161.746475, -0.88024509, -0.283127189, 0.380798608, 0, 0.802493393, 0.596661031, -0.474519312, 0.525207937, -0.706390858)
 
-    local UICorner = Instance.new("UICorner", Frame)
-    UICorner.CornerRadius = UDim.new(0, 10)
+-- إحداثيات عامة
+local ArmoryTeleport = CFrame.new(189.40, 23.10, -214.47)
+local FinalFarmPos = CFrame.new(-36.44, 29.60, -24.68)
 
-    local UIGradient = Instance.new("UIGradient", Frame)
-    UIGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 50)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 50, 80))
-    })
-
-    local Shadow = Instance.new("ImageLabel", Frame)
-    Shadow.Size = UDim2.new(1, 20, 1, 20)
-    Shadow.Position = UDim2.new(0, -10, 0, -10)
-    Shadow.BackgroundTransparency = 1
-    Shadow.Image = "rbxassetid://6014261993"
-    Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    Shadow.ImageTransparency = 0.5
-    Shadow.ZIndex = -1
-
-    local Title = Instance.new("TextLabel", Frame)
-    Title.Size = UDim2.new(1, 0, 0, 50)
-    Title.Text = translations.Arabic.chooseLanguage
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.BackgroundTransparency = 1
-    Title.TextScaled = true
-    Title.Font = Enum.Font.GothamBold
-    Title.TextStrokeTransparency = 0.8
-
-    local ArabicButton = Instance.new("TextButton", Frame)
-    ArabicButton.Size = UDim2.new(0.4, 0, 0, 50)
-    ArabicButton.Position = UDim2.new(0.05, 0, 0.35, 0)
-    ArabicButton.Text = translations.Arabic.arabic
-    ArabicButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ArabicButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    ArabicButton.TextScaled = true
-    ArabicButton.Font = Enum.Font.Gotham
-    local ArabicCorner = Instance.new("UICorner", ArabicButton)
-    ArabicCorner.CornerRadius = UDim.new(0, 8)
-
-    local EnglishButton = Instance.new("TextButton", Frame)
-    EnglishButton.Size = UDim2.new(0.4, 0, 0, 50)
-    EnglishButton.Position = UDim2.new(0.55, 0, 0.35, 0)
-    EnglishButton.Text = translations.Arabic.english
-    EnglishButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    EnglishButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    EnglishButton.TextScaled = true
-    EnglishButton.Font = Enum.Font.Gotham
-    local EnglishCorner = Instance.new("UICorner", EnglishButton)
-    EnglishCorner.CornerRadius = UDim.new(0, 8)
-
-    local ConfirmButton = Instance.new("TextButton", Frame)
-    ConfirmButton.Size = UDim2.new(0.9, 0, 0, 50)
-    ConfirmButton.Position = UDim2.new(0.05, 0, 0.65, 0)
-    ConfirmButton.Text = translations.Arabic.confirm
-    ConfirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-    ConfirmButton.TextScaled = true
-    ConfirmButton.Font = Enum.Font.GothamBold
-    local ConfirmCorner = Instance.new("UICorner", ConfirmButton)
-    ConfirmCorner.CornerRadius = UDim.new(0, 8)
-
-    local selectedLanguage = nil
-    ArabicButton.MouseButton1Click:Connect(function()
-        selectedLanguage = "Arabic"
-        ArabicButton.BackgroundColor3 = Color3.fromRGB(0, 150, 250)
-        EnglishButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    end)
-
-    EnglishButton.MouseButton1Click:Connect(function()
-        selectedLanguage = "English"
-        EnglishButton.BackgroundColor3 = Color3.fromRGB(0, 150, 250)
-        ArabicButton.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    end)
-
-    ConfirmButton.MouseButton1Click:Connect(function()
-        if selectedLanguage then
-            language = selectedLanguage
-            ScreenGui:Destroy()
-        end
-    end)
+-- دالة لجعل اللون أكثر وضوحًا
+local function brightenColor(c)
+    return Color3.new(
+        math.min(1, c.R * 1.3 + 0.1),
+        math.min(1, c.G * 1.3 + 0.1),
+        math.min(1, c.B * 1.3 + 0.1)
+    )
 end
 
--- إنشاء واجهة اختيار اللغة
-createLanguageUI()
+-- ===================================
+-- سكربت فتح الأبواب / Vents / الجدران (يشتغل فقط أثناء الدروب)
+-- ===================================
+getgenv().AllCellPartsOpen = true  -- غيّر false عشان توقف السكريبت كله
 
--- الانتظار حتى يتم اختيار اللغة
-while not language do
-    task.wait(0.1)
-end
+local CellDoorParts = {}   -- أجزاء الأبواب
+local VentParts = {}       -- أجزاء الـ Vents
+local MapBarrierParts = {} -- كل الجدران والحواجز في الماب
 
--- إنشاء واجهة Rayfield
-local Window = Rayfield:CreateWindow({
-    Name = translations[language].windowTitle,
-    LoadingTitle = translations[language].loadingTitle,
-    LoadingSubtitle = translations[language].loadingSubtitle,
-    ConfigurationSaving = {
-        Enabled = false
-    }
-})
-
--- دالة للحصول على الشخصية
-local function getChar()
-    return player.Character or player.CharacterAdded:Wait()
-end
-
--- دالة للعثور على لاعب بناءً على جزء من الاسم
-local function findPlayer(partialName)
-    partialName = partialName:lower()
-    for _, p in pairs(game.Players:GetPlayers()) do
-        if p.Name:lower():match(partialName) then
-            return p
-        end
+-- دالة تحديث الـ root (الحل لمشكلة الموت/الريسبون)
+local function updateRoot()
+    if player.Character then
+        return player.Character:FindFirstChild("HumanoidRootPart")
     end
     return nil
 end
 
--- الدوال
-local function fly(toggle)
-    local char = getChar()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    
-    if toggle then
-        states.fly.enabled = true
-        states.fly.bodyVelocity = Instance.new("BodyVelocity", hrp)
-        states.fly.bodyVelocity.Velocity = Vector3.zero
-        states.fly.bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        states.fly.connection = RunService.Heartbeat:Connect(function()
-            states.fly.bodyVelocity.Velocity = mouse.Hit.LookVector * 50
-        end)
-        Rayfield:Notify({
-            Title = translations[language].fly .. " " .. translations[language].notifyOn,
-            Content = translations[language].fly .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.fly.enabled = false
-        if states.fly.connection then
-            states.fly.connection:Disconnect()
-            states.fly.connection = nil
-        end
-        if states.fly.bodyVelocity then
-            states.fly.bodyVelocity:Destroy()
-            states.fly.bodyVelocity = nil
-        end
-        Rayfield:Notify({
-            Title = translations[language].fly .. " " .. translations[language].notifyOff,
-            Content = translations[language].fly .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
+local root = updateRoot()
 
-local function noclip(toggle)
-    local char = getChar()
-    if toggle then
-        states.noclip.enabled = true
-        states.noclip.connection = RunService.Stepped:Connect(function()
-            for _, v in pairs(char:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
-            end
-        end)
-        Rayfield:Notify({
-            Title = translations[language].noclip .. " " .. translations[language].notifyOn,
-            Content = translations[language].noclip .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.noclip.enabled = false
-        if states.noclip.connection then
-            states.noclip.connection:Disconnect()
-            states.noclip.connection = nil
-        end
-        Rayfield:Notify({
-            Title = translations[language].noclip .. " " .. translations[language].notifyOff,
-            Content = translations[language].noclip .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
+-- تحديث الـ root تلقائيًا عند الريسبون + إيقاف السكريبت نهائيًا + إعادة إغلاق كل الأجزاء التي تم فتحها
+player.CharacterAdded:Connect(function(char)
+    root = char:WaitForChild("HumanoidRootPart")
+    getgenv().AllCellPartsOpen = false  -- إيقاف كل اللووبات والـ Heartbeat نهائيًا
 
-local function god(toggle)
-    local char = getChar()
-    local h = char:FindFirstChildOfClass("Humanoid")
-    if h then
-        if toggle then
-            states.god.enabled = true
-            h.MaxHealth = math.huge
-            h.Health = math.huge
-            h:GetPropertyChangedSignal("Health"):Connect(function()
-                if states.god.enabled then
-                    h.Health = math.huge
-                end
-            end)
-            Rayfield:Notify({
-                Title = translations[language].god .. " " .. translations[language].notifyOn,
-                Content = translations[language].god .. " " .. translations[language].notifyOn:lower(),
-                Duration = 3
-            })
-        else
-            states.god.enabled = false
-            h.MaxHealth = 100
-            h.Health = 100
-            Rayfield:Notify({
-                Title = translations[language].god .. " " .. translations[language].notifyOff,
-                Content = translations[language].god .. " " .. translations[language].notifyOff:lower(),
-                Duration = 3
-            })
-        end
-    else
-        Rayfield:Notify({
-            Title = translations[language].error,
-            Content = translations[language].playerNotFound,
-            Duration = 3
-        })
-    end
-end
-
-local function speed(toggle, value)
-    local h = getChar():FindFirstChildOfClass("Humanoid")
-    if h then
-        if toggle then
-            states.speed.enabled = true
-            states.speed.originalSpeed = h.WalkSpeed
-            h.WalkSpeed = value or 100
-            Rayfield:Notify({
-                Title = translations[language].speed .. " " .. translations[language].notifyOn,
-                Content = translations[language].speed .. " " .. translations[language].notifyOn:lower() .. " (" .. (value or 100) .. ")",
-                Duration = 3
-            })
-        else
-            states.speed.enabled = false
-            h.WalkSpeed = states.speed.originalSpeed
-            Rayfield:Notify({
-                Title = translations[language].speed .. " " .. translations[language].notifyOff,
-                Content = translations[language].speed .. " " .. translations[language].notifyOff:lower(),
-                Duration = 3
-            })
+    -- إعادة إغلاق كل الجدران والحواجز التي تم فتحها سابقًا
+    for part, _ in pairs(MapBarrierParts) do
+        if part and part.Parent then
+            part.CanCollide = true
         end
     end
-end
 
-local function jump(toggle)
-    local h = getChar():FindFirstChildOfClass("Humanoid")
-    if h then
-        if toggle then
-            states.jump.enabled = true
-            states.jump.originalJump = h.JumpPower
-            h.JumpPower = 150
-            Rayfield:Notify({
-                Title = translations[language].jump .. " " .. translations[language].notifyOn,
-                Content = translations[language].jump .. " " .. translations[language].notifyOn:lower(),
-                Duration = 3
-            })
-        else
-            states.jump.enabled = false
-            h.JumpPower = states.jump.originalJump
-            Rayfield:Notify({
-                Title = translations[language].jump .. " " .. translations[language].notifyOff,
-                Content = translations[language].jump .. " " .. translations[language].notifyOff:lower(),
-                Duration = 3
-            })
+    -- إعادة إغلاق الأبواب والـ Vents التي كانت مفتوحة (للأمان والعودة للحالة الطبيعية)
+    for part, _ in pairs(CellDoorParts) do
+        if part and part.Parent then
+            part.CanCollide = true
         end
     end
-end
 
-local function invisible(toggle)
-    local char = getChar()
-    if toggle then
-        states.invisible.enabled = true
-        char.Archivable = true
-        states.invisible.clone = char:Clone()
-        states.invisible.clone.Parent = Workspace
-        char.Parent = nil
-        for _, part in pairs(states.invisible.clone:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                part.Transparency = 1
-                if part:FindFirstChild("face") then
-                    part.face.Transparency = 1
-                end
-            end
+    for part, _ in pairs(VentParts) do
+        if part and part.Parent then
+            part.CanCollide = true
         end
-        Rayfield:Notify({
-            Title = translations[language].invisible .. " " .. translations[language].notifyOn,
-            Content = translations[language].invisible .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.invisible.enabled = false
-        if states.invisible.clone then
-            states.invisible.clone:Destroy()
-            states.invisible.clone = nil
-        end
-        char.Parent = Workspace
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                part.Transparency = part:GetAttribute("OriginalTransparency") or 0
-                if part:FindFirstChild("face") then
-                    part.face.Transparency = part:GetAttribute("OriginalTransparency") or 0
-                end
-            end
-        end
-        Rayfield:Notify({
-            Title = translations[language].invisible .. " " .. translations[language].notifyOff,
-            Content = translations[language].invisible .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
-
-local function freeze(toggle)
-    local char = getChar()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    if toggle then
-        states.freeze.enabled = true
-        hrp.Anchored = true
-        Rayfield:Notify({
-            Title = translations[language].freeze .. " " .. translations[language].notifyOn,
-            Content = translations[language].freeze .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.freeze.enabled = false
-        hrp.Anchored = false
-        Rayfield:Notify({
-            Title = translations[language].freeze .. " " .. translations[language].notifyOff,
-            Content = translations[language].freeze .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
-
-local function goto(targetPlayerName)
-    local target = findPlayer(targetPlayerName)
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local char = getChar()
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        hrp.CFrame = target.Character.HumanoidRootPart.CFrame
-        Rayfield:Notify({
-            Title = translations[language].gotoPlayer,
-            Content = translations[language].gotoPlayer .. ": " .. target.Name,
-            Duration = 3
-        })
-    else
-        Rayfield:Notify({
-            Title = translations[language].error,
-            Content = translations[language].playerNotFound,
-            Duration = 3
-        })
-    end
-end
-
-local function kill(targetPlayerName)
-    local target = findPlayer(targetPlayerName)
-    if target and target.Character then
-        local h = target.Character:FindFirstChildOfClass("Humanoid")
-        if h then
-            h.Health = 0
-            Rayfield:Notify({
-                Title = translations[language].killPlayer,
-                Content = translations[language].killPlayer .. ": " .. target.Name,
-                Duration = 3
-            })
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].playerNotFound,
-                Duration = 3
-            })
-        end
-    else
-        Rayfield:Notify({
-            Title = translations[language].error,
-            Content = translations[language].playerNotFound,
-            Duration = 3
-        })
-    end
-end
-
-local function spectate(toggle, targetPlayerName)
-    local target = findPlayer(targetPlayerName)
-    if toggle then
-        if target and target.Character then
-            states.spectate.enabled = true
-            Camera.CameraSubject = target.Character:FindFirstChildOfClass("Humanoid")
-            states.spectate.connection = RunService.RenderStepped:Connect(function()
-                if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                    Camera.CFrame = CFrame.new(target.Character.HumanoidRootPart.Position + Vector3.new(0, 5, 10))
-                end
-            end)
-            Rayfield:Notify({
-                Title = translations[language].spectatePlayer .. " " .. translations[language].notifyOn,
-                Content = translations[language].spectatePlayer .. ": " .. target.Name,
-                Duration = 3
-            })
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].playerNotFound,
-                Duration = 3
-            })
-        end
-    else
-        states.spectate.enabled = false
-        if states.spectate.connection then
-            states.spectate.connection:Disconnect()
-            states.spectate.connection = nil
-        end
-        Camera.CameraSubject = getChar():FindFirstChildOfClass("Humanoid")
-        Rayfield:Notify({
-            Title = translations[language].spectatePlayer .. " " .. translations[language].notifyOff,
-            Content = translations[language].spectatePlayer .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
-
-local function fling(targetPlayerName)
-    local target = findPlayer(targetPlayerName)
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = target.Character.HumanoidRootPart
-        local bodyVelocity = Instance.new("BodyVelocity", hrp)
-        bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        bodyVelocity.Velocity = Vector3.new(0, 1000, 0)
-        task.wait(0.5)
-        bodyVelocity:Destroy()
-        Rayfield:Notify({
-            Title = translations[language].flingPlayer,
-            Content = translations[language].flingPlayer .. ": " .. target.Name,
-            Duration = 3
-        })
-    else
-        Rayfield:Notify({
-            Title = translations[language].error,
-            Content = translations[language].playerNotFound,
-            Duration = 3
-        })
-    end
-end
-
-local function tooldrop()
-    local char = getChar()
-    local h = char:FindFirstChildOfClass("Humanoid")
-    if h then
-        for _, tool in pairs(char:GetChildren()) do
-            if tool:IsA("Tool") then
-                tool.Parent = Workspace
-            end
-        end
-        Rayfield:Notify({
-            Title = translations[language].tooldrop,
-            Content = translations[language].tooldrop .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        Rayfield:Notify({
-            Title = translations[language].error,
-            Content = translations[language].playerNotFound,
-            Duration = 3
-        })
-    end
-end
-
-local function nuke()
-    local char = getChar()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    local explosion = Instance.new("Explosion")
-    explosion.Position = hrp.Position
-    explosion.BlastRadius = 50
-    explosion.BlastPressure = 50000
-    explosion.Parent = Workspace
-    Rayfield:Notify({
-        Title = translations[language].nuke,
-        Content = translations[language].nuke .. " " .. translations[language].notifyOn:lower(),
-        Duration = 3
-    })
-end
-
-local function rejoin()
-    game:GetService("TeleportService"):Teleport(game.PlaceId, player)
-    Rayfield:Notify({
-        Title = translations[language].rejoin,
-        Content = translations[language].rejoin .. " " .. translations[language].notifyOn:lower(),
-        Duration = 3
-    })
-end
-
-local function xray(toggle)
-    if toggle then
-        states.xray.enabled = true
-        for _, part in pairs(Workspace:GetDescendants()) do
-            if part:IsA("BasePart") and part ~= getChar():FindFirstChild("HumanoidRootPart") then
-                part:SetAttribute("OriginalTransparency", part.Transparency)
-                part.Transparency = 0.7
-            end
-        end
-        Rayfield:Notify({
-            Title = translations[language].xray .. " " .. translations[language].notifyOn,
-            Content = translations[language].xray .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.xray.enabled = false
-        for _, part in pairs(Workspace:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = part:GetAttribute("OriginalTransparency") or 0
-            end
-        end
-        Rayfield:Notify({
-            Title = translations[language].xray .. " " .. translations[language].notifyOff,
-            Content = translations[language].xray .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
-
-local function esp(toggle)
-    if toggle then
-        states.esp.enabled = true
-        for _, p in pairs(game.Players:GetPlayers()) do
-            if p ~= player and p.Character then
-                local highlight = Instance.new("Highlight", p.Character)
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                highlight.FillTransparency = 0.5
-                states.esp.highlights[p] = highlight
-            end
-        end
-        Rayfield:Notify({
-            Title = translations[language].esp .. " " .. translations[language].notifyOn,
-            Content = translations[language].esp .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
-    else
-        states.esp.enabled = false
-        for _, highlight in pairs(states.esp.highlights) do
-            highlight:Destroy()
-        end
-        states.esp.highlights = {}
-        Rayfield:Notify({
-            Title = translations[language].esp .. " " .. translations[language].notifyOff,
-            Content = translations[language].esp .. " " .. translations[language].notifyOff:lower(),
-            Duration = 3
-        })
-    end
-end
-
-local function refresh()
-    player:LoadCharacter()
-    states.fly.enabled = false
-    states.noclip.enabled = false
-    states.god.enabled = false
-    states.speed.enabled = false
-    states.jump.enabled = false
-    states.invisible.enabled = false
-    states.freeze.enabled = false
-    states.spectate.enabled = false
-    states.xray.enabled = false
-    states.esp.enabled = false
-    if states.spectate.connection then
-        states.spectate.connection:Disconnect()
-        states.spectate.connection = nil
-    end
-    if states.invisible.clone then
-        states.invisible.clone:Destroy()
-        states.invisible.clone = nil
-    end
-    for _, highlight in pairs(states.esp.highlights) do
-        highlight:Destroy()
-    end
-    states.esp.highlights = {}
-    Rayfield:Notify({
-        Title = translations[language].refresh,
-        Content = translations[language].refresh .. " " .. translations[language].notifyOn:lower(),
-        Duration = 3
-    })
-end
-
--- الأقسام
-local movementTab = Window:CreateTab(translations[language].movementTab, 4483362458)
-local powersTab = Window:CreateTab(translations[language].powersTab, 4483362458)
-local playersTab = Window:CreateTab(translations[language].playersTab, 4483362458)
-local customTab = Window:CreateTab(translations[language].customTab, 4483362458)
-local settingsTab = Window:CreateTab(translations[language].settingsTab, 4483362458)
-
--- الحركة
-movementTab:CreateButton({
-    Name = translations[language].fly,
-    Callback = function()
-        fly(not states.fly.enabled)
-    end
-})
-movementTab:CreateButton({
-    Name = translations[language].noclip,
-    Callback = function()
-        noclip(not states.noclip.enabled)
-    end
-})
-movementTab:CreateButton({
-    Name = translations[language].speed,
-    Callback = function()
-        speed(not states.speed.enabled)
-    end
-})
-movementTab:CreateInput({
-    Name = translations[language].speedInput,
-    PlaceholderText = translations[language].speedInput,
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local value = tonumber(text)
-        if value then
-            speed(true, value)
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].error .. ": Invalid Number",
-                Duration = 3
-            })
-        end
-    end
-})
-movementTab:CreateButton({
-    Name = translations[language].jump,
-    Callback = function()
-        jump(not states.jump.enabled)
-    end
-})
-
--- القدرات
-powersTab:CreateButton({
-    Name = translations[language].god,
-    Callback = function()
-        god(not states.god.enabled)
-    end
-})
-powersTab:CreateButton({
-    Name = translations[language].invisible,
-    Callback = function()
-        invisible(not states.invisible.enabled)
-    end
-})
-powersTab:CreateButton({
-    Name = translations[language].freeze,
-    Callback = function()
-        freeze(not states.freeze.enabled)
-    end
-})
-powersTab:CreateButton({
-    Name = translations[language].xray,
-    Callback = function()
-        xray(not states.xray.enabled)
-    end
-})
-powersTab:CreateButton({
-    Name = translations[language].esp,
-    Callback = function()
-        esp(not states.esp.enabled)
-    end
-})
-powersTab:CreateButton({
-    Name = translations[language].tooldrop,
-    Callback = tooldrop
-})
-powersTab:CreateButton({
-    Name = translations[language].nuke,
-    Callback = nuke
-})
-powersTab:CreateButton({
-    Name = translations[language].rejoin,
-    Callback = rejoin
-})
-
--- اللاعبين
-local selectedPlayer = nil
-local playerDropdown = playersTab:CreateDropdown({
-    Name = translations[language].selectPlayer,
-    Options = {},
-    CurrentOption = nil,
-    Callback = function(opt)
-        selectedPlayer = opt
-    end
-})
-
-playersTab:CreateInput({
-    Name = translations[language].playerInput,
-    PlaceholderText = translations[language].playerInput,
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        selectedPlayer = findPlayer(text) and findPlayer(text).Name or nil
-        if selectedPlayer then
-            Rayfield:Notify({
-                Title = translations[language].selectPlayer,
-                Content = translations[language].selectPlayer .. ": " .. selectedPlayer,
-                Duration = 3
-            })
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].playerNotFound,
-                Duration = 3
-            })
-        end
-    end
-})
-
-playersTab:CreateButton({
-    Name = translations[language].killPlayer,
-    Callback = function()
-        if selectedPlayer then
-            kill(selectedPlayer)
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].selectPlayerError,
-                Duration = 3
-            })
-        end
-    end
-})
-
-playersTab:CreateButton({
-    Name = translations[language].gotoPlayer,
-    Callback = function()
-        if selectedPlayer then
-            goto(selectedPlayer)
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].selectPlayerError,
-                Duration = 3
-            })
-        end
-    end
-})
-
-playersTab:CreateButton({
-    Name = translations[language].spectatePlayer,
-    Callback = function()
-        if selectedPlayer then
-            spectate(not states.spectate.enabled, selectedPlayer)
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].selectPlayerError,
-                Duration = 3
-            })
-        end
-    end
-})
-
-playersTab:CreateButton({
-    Name = translations[language].flingPlayer,
-    Callback = function()
-        if selectedPlayer then
-            fling(selectedPlayer)
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].selectPlayerError,
-                Duration = 3
-            })
-        end
-    end
-})
-
--- تحديث قائمة اللاعبين
-local function updatePlayerList()
-    local names = {}
-    for _, p in pairs(game.Players:GetPlayers()) do
-        if p ~= player then
-            table.insert(names, p.Name)
-        end
-    end
-    playerDropdown:Set(names)
-end
-
-task.spawn(function()
-    while true do
-        updatePlayerList()
-        task.wait(5)
     end
 end)
 
--- أمر مخصص
-customTab:CreateInput({
-    Name = translations[language].customCommand,
-    PlaceholderText = translations[language].customPlaceholder,
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local h = getChar():FindFirstChildOfClass("Humanoid")
-        local hrp = getChar():WaitForChild("HumanoidRootPart")
-        text = text:lower()
-        if text:match("speed") then
-            local num = tonumber(text:match("%d+"))
-            if h and num then
-                speed(true, num)
+-- ★★★ refresh Vents ★★★
+local function refreshVents()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name:lower():find("vent") then
+            for _, part in pairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    VentParts[part] = true
+                end
             end
-        elseif text:match("jump") then
-            local num = tonumber(text:match("%d+"))
-            if h and num then
-                h.JumpPower = num
-                Rayfield:Notify({
-                    Title = translations[language].jump,
-                    Content = translations[language].jump .. ": " .. num,
-                    Duration = 3
-                })
-            end
-        elseif text:match("goto") then
-            local targetName = text:match("%s+(%w+)$")
-            if targetName then
-                goto(targetName)
-            end
-        elseif text:match("kill") then
-            local targetName = text:match("%s+(%w+)$")
-            if targetName then
-                kill(targetName)
-            end
-        elseif text:match("spectate") then
-            local targetName = text:match("%s+(%w+)$")
-            if targetName then
-                spectate(true, targetName)
-            end
-        elseif text:match("fling") then
-            local targetName = text:match("%s+(%w+)$")
-            if targetName then
-                fling(targetName)
-            end
-        elseif text:match("tooldrop") then
-            tooldrop()
-        elseif text:match("nuke") then
-            nuke()
-        elseif text:match("rejoin") then
-            rejoin()
-        elseif text:match("xray") then
-            xray(true)
-        elseif text:match("esp") then
-            esp(true)
-        elseif text:match("refresh") then
-            refresh()
-        else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = translations[language].customCommand .. " Not Supported",
-                Duration = 3
-            })
         end
     end
-})
+end
 
--- إعدادات عامة
-settingsTab:CreateButton({
-    Name = translations[language].resetAll,
-    Callback = function()
-        fly(false)
-        noclip(false)
-        god(false)
-        speed(false)
-        jump(false)
-        invisible(false)
-        freeze(false)
-        spectate(false, selectedPlayer or player.Name)
-        xray(false)
-        esp(false)
-        Rayfield:Notify({
-            Title = translations[language].resetAll,
-            Content = translations[language].resetAll .. " " .. translations[language].notifyOff,
-            Duration = 3
-        })
+-- فحص الأبواب
+local function scanDoors()
+    local doorsFolder = workspace.Map.Functional:FindFirstChild("Doors")
+    if not doorsFolder then return end
+
+    for _, cell in pairs(doorsFolder:GetChildren()) do
+        local doorMain = cell:FindFirstChild("DoorMain") or cell
+        if doorMain then
+            for _, part in pairs(doorMain:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    CellDoorParts[part] = true
+                end
+            end
+        end
     end
-})
+end
 
-settingsTab:CreateButton({
-    Name = translations[language].closeUI,
-    Callback = function()
-        Rayfield:Destroy()
-        Rayfield:Notify({
-            Title = translations[language].closeUI,
-            Content = translations[language].closeUI .. " " .. translations[language].notifyOn:lower(),
-            Duration = 3
-        })
+-- ★★★ فتح كل الجدران والحواجز دائمًا (مع استثناء أقوى للأرض) ★★★
+local function scanMapWallsAndBarriers()
+    for _, part in pairs(workspace.Map:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide and not MapBarrierParts[part] then
+            -- استثناء أقوى للأرض والأرضيات (ما تفتح أبدًا عشان ما تطيح)
+            if part.Name == "Baseplate" or 
+               part.Name == "Grass" or 
+               part.Name:lower():find("floor") or 
+               part.Name:lower():find("ground") or 
+               part.Name:lower():find("terrain") or
+               part.Name:lower():find("base") then
+                continue 
+            end
+
+            part.CanCollide = false  -- نفتحها دائمًا
+            MapBarrierParts[part] = true
+        end
     end
+end
+
+-- فحص مستمر (أبواب + vents + جدران الماب كاملة)
+spawn(function()
+    while getgenv().AllCellPartsOpen do
+        scanDoors()
+        refreshVents()
+        scanMapWallsAndBarriers()
+        task.wait(1.5)
+    end
+end)
+
+-- Auto Open فقط للأبواب والـ Vents عند الاقتراب (الجدران مفتوحة دائمًا)
+RunService.Heartbeat:Connect(function()
+    if not getgenv().AllCellPartsOpen then return end
+    
+    root = updateRoot()  -- تحديث الـ root كل فريم (آمن وخفيف)
+    if not root then return end
+
+    local function openIfNear(tbl)
+        for part, _ in pairs(tbl) do
+            if part and part.Parent then
+                local dist = (root.Position - part.Position).Magnitude
+                if dist <= 18 then
+                    part.CanCollide = false
+                else
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+
+    openIfNear(CellDoorParts)
+    openIfNear(VentParts)
+    -- الجدران مفتوحة دائمًا → ما نحتاجش نلمسها هنا
+end)
+
+-- ===================================
+-- إنشاء الواجهة الرسومية
+-- ===================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "GunSpawnerUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 360, 0, 580)
+mainFrame.Position = UDim2.new(0, 20, 0.5, -290)
+mainFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(52, 50, 82)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(35, 22, 44)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 19))
 })
+gradient.Rotation = 0
+gradient.Parent = mainFrame
 
--- قسم مضاف: 📦 ريسبون آيتم --
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Thickness = 3
+mainStroke.Color = Color3.fromRGB(0, 0, 0)
+mainStroke.Parent = mainFrame
 
+-- التبويبات
+local tabNames = {"Locations", "Players", "Teleport", "Player"}
+local tabButtons = {}
+local tabContents = {}
 
--- السكربت الأصلي محفوظ كما هو، إضافة قسم ريسبون آيتم فقط --
+local tabsFrame = Instance.new("Frame")
+tabsFrame.Size = UDim2.new(0.9, 0, 0, 50)
+tabsFrame.Position = UDim2.new(0.05, 0, 0, 20)
+tabsFrame.BackgroundTransparency = 1
+tabsFrame.Parent = mainFrame
 
--- قسم الترجمة الجديد
-translations.Arabic.respawnItem = "📦 ريسبون آيتم"
-translations.Arabic.itemPlaceholder = "اكتب اسم الأداة مثل: Gun أو ToolName"
-translations.English.respawnItem = "📦 Respawn Item"
-translations.English.itemPlaceholder = "Enter item name like: Gun or ToolName"
+local tabPadding = 5
+local totalWidth = 360 * 0.9
+local buttonWidth = (totalWidth - (#tabNames - 1) * tabPadding) / #tabNames
 
--- تبويب جديد لواجهة جلب العناصر
-local itemsTab = Window:CreateTab(translations[language].respawnItem, 4483362458)
+for i, name in ipairs(tabNames) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, buttonWidth, 1, 0)
+    btn.Position = UDim2.new(0, (i-1) * (buttonWidth + tabPadding), 0, 0)
+    btn.BackgroundColor3 = (i == 1) and Color3.fromRGB(62, 39, 78) or Color3.fromRGB(102, 65, 129)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 18
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = false
+    btn.Parent = tabsFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+    tabButtons[name] = btn
 
-itemsTab:CreateInput({
-    Name = translations[language].respawnItem,
-    PlaceholderText = translations[language].itemPlaceholder,
-    RemoveTextAfterFocusLost = false,
-    Callback = function(itemName)
-        if itemName and itemName ~= "" then
-            local char = getChar()
-            local function findItem(storage)
-                for _, item in pairs(storage:GetChildren()) do
-                    if item:IsA("Tool") and item.Name:lower() == itemName:lower() then
-                        return item
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(0.9, 0, 0, 500)
+    content.Position = UDim2.new(0.05, 0, 0, 80)
+    content.BackgroundTransparency = 1
+    content.Visible = (i == 1)
+    content.Parent = mainFrame
+    tabContents[name] = content
+end
+
+for _, name in ipairs(tabNames) do
+    tabButtons[name].MouseButton1Click:Connect(function()
+        for k, b in pairs(tabButtons) do
+            b.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+            tabContents[k].Visible = false
+        end
+        tabButtons[name].BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+        local newContent = tabContents[name]
+        newContent.Position = UDim2.new(0.05, 0, 0, 80)
+        newContent.Visible = true
+    end)
+end
+
+-- ==================== Locations Tab ====================
+local locContent = tabContents["Locations"]
+
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0.9, 0, 0, 70)
+minBtn.Position = UDim2.new(0.05, 0, 0, 20)
+minBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+minBtn.Text = "Min Lobby"
+minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.TextSize = 30
+minBtn.Font = Enum.Font.GothamBold
+minBtn.Parent = locContent
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 14)
+
+local maxBtn = Instance.new("TextButton")
+maxBtn.Size = UDim2.new(0.9, 0, 0, 70)
+maxBtn.Position = UDim2.new(0.05, 0, 0, 110)
+maxBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+maxBtn.Text = "Max"
+maxBtn.TextColor3 = Color3.new(1,1,1)
+maxBtn.TextSize = 30
+maxBtn.Font = Enum.Font.GothamBold
+maxBtn.Parent = locContent
+Instance.new("UICorner", maxBtn).CornerRadius = UDim.new(0, 14)
+
+local bookingBtn = Instance.new("TextButton")
+bookingBtn.Size = UDim2.new(0.9, 0, 0, 70)
+bookingBtn.Position = UDim2.new(0.05, 0, 0, 200)
+bookingBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+bookingBtn.Text = "Booking"
+bookingBtn.TextColor3 = Color3.new(1,1,1)
+bookingBtn.TextSize = 30
+bookingBtn.Font = Enum.Font.GothamBold
+bookingBtn.Parent = locContent
+Instance.new("UICorner", bookingBtn).CornerRadius = UDim.new(0, 14)
+
+minBtn.MouseButton1Click:Connect(function()
+    minBtn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+    maxBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    bookingBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    selectedLocation = "Min"
+end)
+
+maxBtn.MouseButton1Click:Connect(function()
+    maxBtn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+    minBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    bookingBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    selectedLocation = "Max"
+end)
+
+bookingBtn.MouseButton1Click:Connect(function()
+    bookingBtn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+    minBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    maxBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    selectedLocation = "Booking"
+end)
+
+local locSpawnBtn = Instance.new("TextButton")
+locSpawnBtn.Size = UDim2.new(0.9, 0, 0, 60)
+locSpawnBtn.Position = UDim2.new(0.05, 0, 0, 290)
+locSpawnBtn.BackgroundColor3 = Color3.fromRGB(52, 50, 82)
+locSpawnBtn.Text = "Spawn"
+locSpawnBtn.TextColor3 = Color3.new(1,1,1)
+locSpawnBtn.TextSize = 30
+locSpawnBtn.Font = Enum.Font.GothamBold
+locSpawnBtn.Parent = locContent
+Instance.new("UICorner", locSpawnBtn).CornerRadius = UDim.new(0, 14)
+
+local locLoadingDot = Instance.new("Frame")
+locLoadingDot.Size = UDim2.new(0, 20, 0, 20)
+locLoadingDot.Position = UDim2.new(1, -30, 0.5, -10)
+locLoadingDot.BackgroundColor3 = Color3.fromHex("#22B365")
+locLoadingDot.Visible = false
+locLoadingDot.Parent = locSpawnBtn
+Instance.new("UICorner", locLoadingDot).CornerRadius = UDim.new(1, 0)
+
+-- ==================== Players Tab ====================
+local playersContent = tabContents["Players"]
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1,0,0.65,0)
+scroll.Position = UDim2.new(0,0,0,0)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+scroll.Parent = playersContent
+
+local list = Instance.new("UIListLayout")
+list.Padding = UDim.new(0,8)
+list.Parent = scroll
+
+local viewBtn = Instance.new("TextButton")
+viewBtn.Size = UDim2.new(0.9, 0, 0, 55)
+viewBtn.Position = UDim2.new(0.05, 0, 0.68, 0)
+viewBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+viewBtn.Text = "View Player"
+viewBtn.TextColor3 = Color3.new(1,1,1)
+viewBtn.TextSize = 26
+viewBtn.Font = Enum.Font.GothamBold
+viewBtn.Parent = playersContent
+Instance.new("UICorner", viewBtn).CornerRadius = UDim.new(0, 14)
+
+local playersSpawnBtn = Instance.new("TextButton")
+playersSpawnBtn.Size = UDim2.new(0.9, 0, 0, 60)
+playersSpawnBtn.Position = UDim2.new(0.05, 0, 0.80, 0)
+playersSpawnBtn.BackgroundColor3 = Color3.fromRGB(52, 50, 82)
+playersSpawnBtn.Text = "Spawn"
+playersSpawnBtn.TextColor3 = Color3.new(1,1,1)
+playersSpawnBtn.TextSize = 30
+playersSpawnBtn.Font = Enum.Font.GothamBold
+playersSpawnBtn.Parent = playersContent
+Instance.new("UICorner", playersSpawnBtn).CornerRadius = UDim.new(0, 14)
+
+local playersLoadingDot = Instance.new("Frame")
+playersLoadingDot.Size = UDim2.new(0, 20, 0, 20)
+playersLoadingDot.Position = UDim2.new(1, -30, 0.5, -10)
+playersLoadingDot.BackgroundColor3 = Color3.fromHex("#22B365")
+playersLoadingDot.Visible = false
+playersLoadingDot.Parent = playersSpawnBtn
+Instance.new("UICorner", playersLoadingDot).CornerRadius = UDim.new(1, 0)
+
+-- متغيرات الـ View/Spectate
+local isViewing = false
+local viewConnection
+local oldCamType, oldCamSubject
+local lastTargetPos = nil
+
+local function toggleView()
+    if not selectedPlayer then
+        game.StarterGui:SetCore("SendNotification",{Title="خطأ",Text="اختر لاعب أولاً!",Duration=3})
+        return
+    end
+
+    if isViewing then
+        isViewing = false
+        viewBtn.Text = "View Player"
+        viewBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+        if viewConnection then viewConnection:Disconnect() end
+        camera.CameraType = oldCamType
+        camera.CameraSubject = oldCamSubject
+        lastTargetPos = nil
+        game.StarterGui:SetCore("SendNotification",{Title="View",Text="تم إيقاف المشاهدة",Duration=2})
+    else
+        oldCamType = camera.CameraType
+        oldCamSubject = camera.CameraSubject
+        
+        isViewing = true
+        viewBtn.Text = "Stop View"
+        viewBtn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+        camera.CameraType = Enum.CameraType.Scriptable
+        
+        local function updateView()
+            local targetChar = selectedPlayer.Character
+            if targetChar then
+                local targetHead = targetChar:FindFirstChild("Head")
+                local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+                local pos = (targetHead and targetHead.Position) or (targetHRP and targetHRP.Position) or lastTargetPos
+                if pos then
+                    lastTargetPos = pos
+                    camera.CFrame = CFrame.lookAt(pos + Vector3.new(0, 2, 8), pos)
+                end
+            end
+        end
+        
+        viewConnection = RunService.RenderStepped:Connect(updateView)
+        
+        local charAddedConn
+        charAddedConn = selectedPlayer.CharacterAdded:Connect(function()
+            if isViewing then
+                task.wait(1)
+                updateView()
+            end
+        end)
+        
+        game.StarterGui:SetCore("SendNotification",{Title="View",Text="تتبع اللاعب: "..selectedPlayer.Name.." (حتى بعد الموت، يمكنك التدوير بالماوس)",Duration=3})
+    end
+end
+
+viewBtn.MouseButton1Click:Connect(toggleView)
+
+local function getPlayerTeamInfo(p)
+    if p.Team and p.Team.Name then
+        local teamName = p.Team.Name
+        if teamName == "Maximum Security" then
+            return "Max", brightenColor(p.Team.TeamColor.Color)
+        elseif teamName == "Minimum Security" then
+            return "Min", brightenColor(p.Team.TeamColor.Color)
+        end
+    end
+    return nil, nil
+end
+
+local function refreshPlayers()
+    for _,v in scroll:GetChildren() do if v:IsA("TextButton") then v:Destroy() end end
+    
+    local maxPlayers = {}
+    local minPlayers = {}
+    
+    for _, p in Players:GetPlayers() do
+        if p ~= player then
+            local teamType, textColor = getPlayerTeamInfo(p)
+            if teamType == "Max" then
+                table.insert(maxPlayers, {player = p, color = textColor})
+            elseif teamType == "Min" then
+                table.insert(minPlayers, {player = p, color = textColor})
+            end
+        end
+    end
+    
+    for _, info in ipairs(maxPlayers) do
+        local p = info.player
+        local textColor = info.color
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.95,0,0,50)
+        btn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+        btn.Text = p.Name .. " (Max)"
+        btn.TextColor3 = textColor
+        btn.TextSize = 24
+        btn.Font = Enum.Font.Gotham
+        btn.AutoButtonColor = false
+        btn.Parent = scroll
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+        
+        btn.MouseButton1Click:Connect(function()
+            selectedPlayer = p
+            for _,b in scroll:GetChildren() do 
+                if b:IsA("TextButton") then 
+                    b.BackgroundColor3 = Color3.fromRGB(102, 65, 129) 
+                end 
+            end
+            btn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+            game.StarterGui:SetCore("SendNotification",{Title="Target Selected",Text="Drop at: "..p.Name.." (Max)",Duration=3})
+        end)
+    end
+    
+    for _, info in ipairs(minPlayers) do
+        local p = info.player
+        local textColor = info.color
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0.95,0,0,50)
+        btn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+        btn.Text = p.Name .. " (Min)"
+        btn.TextColor3 = textColor
+        btn.TextSize = 24
+        btn.Font = Enum.Font.Gotham
+        btn.AutoButtonColor = false
+        btn.Parent = scroll
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+        
+        btn.MouseButton1Click:Connect(function()
+            selectedPlayer = p
+            for _,b in scroll:GetChildren() do 
+                if b:IsA("TextButton") then 
+                    b.BackgroundColor3 = Color3.fromRGB(102, 65, 129) 
+                end 
+            end
+            btn.BackgroundColor3 = Color3.fromRGB(62, 39, 78)
+            game.StarterGui:SetCore("SendNotification",{Title="Target Selected",Text="Drop at: "..p.Name.." (Min)",Duration=3})
+        end)
+    end
+    
+    local totalPlayers = #maxPlayers + #minPlayers
+    scroll.CanvasSize = UDim2.new(0,0,0,totalPlayers * 58)
+end
+
+Players.PlayerAdded:Connect(refreshPlayers)
+Players.PlayerRemoving:Connect(refreshPlayers)
+refreshPlayers()
+
+-- ==================== Teleport Tab ====================
+local tpContent = tabContents["Teleport"]
+
+local teleportButtons = {
+    {name = "Gun", action = "gun"},
+    {name = "Keycard", action = "keycard"},
+    {name = "Maintenance", pos = CFrame.new(172.34, 23.10, -143.87)},
+    {name = "Security", pos = CFrame.new(224.47, 23.10, -167.90)},
+    {name = "OC Lockers", pos = CFrame.new(137.60, 23.10, -169.93)},
+    {name = "RIOT Lockers", pos = CFrame.new(165.63, 23.10, -192.25)},
+    {name = "Ventilation", pos = CFrame.new(76.96, -7.02, -19.21)},
+    {name = "Maximum", pos = CFrame.new(99.85, -8.87, -156.13)},
+    {name = "Generator", pos = CFrame.new(100.95, -8.82, -57.59)},
+    {name = "Outside", pos = CFrame.new(350.22, 5.40, -171.09)},
+    {name = "Escape Base", pos = CFrame.new(749.02, -0.97, -470.45)},
+    {name = "Escape", pos = CFrame.new(307.06, 5.40, -177.88)},
+    {name = "Keycard (💳)", pos = CFrame.new(-13.36, 22.13, -27.47)},
+    {name = "GAS STATION", pos = CFrame.new(274.30, 6.21, -612.77)},
+    {name = "armory", pos = CFrame.new(189.40, 23.10, -214.47)},
+    {name = "BARN", pos = CFrame.new(43.68, 10.37, 395.04)},
+    {name = "R&D", pos = CFrame.new(-182.35, -85.90, 158.07)}
+}
+
+local tpScroll = Instance.new("ScrollingFrame")
+tpScroll.Size = UDim2.new(1,0,1,0)
+tpScroll.Position = UDim2.new(0,0,0,0)
+tpScroll.BackgroundTransparency = 1
+tpScroll.ScrollBarThickness = 6
+tpScroll.Parent = tpContent
+
+local tpList = Instance.new("UIListLayout")
+tpList.Padding = UDim.new(0,8)
+tpList.Parent = tpScroll
+
+for i, tp in ipairs(teleportButtons) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.95,0,0,50)
+    btn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+    btn.Text = tp.name
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 24
+    btn.Font = Enum.Font.Gotham
+    btn.AutoButtonColor = false
+    btn.Parent = tpScroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+    if tp.action == "gun" then
+        btn.MouseButton1Click:Connect(function()
+            game.StarterGui:SetCore("SendNotification",{Title="Gun Activated",Text="WIP",Duration=3})
+        end)
+    elseif tp.action == "keycard" then
+        btn.MouseButton1Click:Connect(function()
+            game.StarterGui:SetCore("SendNotification",{Title="Keycard Activated",Text="WIP",Duration=3})
+        end)
+    elseif tp.pos then
+        btn.MouseButton1Click:Connect(function()
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = tp.pos
+                game.StarterGui:SetCore("SendNotification",{Title="Teleported",Text="To " .. tp.name,Duration=3})
+            end
+        end)
+    end
+end
+tpScroll.CanvasSize = UDim2.new(0,0,0,#teleportButtons*58)
+
+-- ==================== Player Tab ====================
+local playerContent = tabContents["Player"]
+
+getgenv().Psalms = getgenv().Psalms or {
+    Tech = {
+        speedvalue = 3,
+        cframespeedtoggle = false
+    }
+}
+
+local function UpdateSpeedValue(newValue)
+    local numValue = tonumber(newValue)
+    if numValue and numValue >= 0 and numValue <= 10 then
+        getgenv().Psalms.Tech.speedvalue = numValue
+        if getgenv().flyEnabled then
+            EnableFly(false)
+            EnableFly(true)
+        end
+        if getgenv().Psalms.Tech.cframespeedtoggle then
+            EnableCFrameSpeed(false)
+            EnableCFrameSpeed(true)
+        end
+    end
+end
+
+local function EnableCFrameSpeed(state)
+    getgenv().Psalms.Tech.cframespeedtoggle = state
+    local speeds = getgenv().Psalms.Tech.speedvalue
+    local tpwalking = false
+    local speaker = game:GetService("Players").LocalPlayer
+
+    if state then
+        tpwalking = true
+        for i = 1, speeds do
+            spawn(function()
+                local RunService = game:GetService("RunService")
+                local hb = RunService.Heartbeat
+                local chr = speaker.Character
+                local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+                while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+                    if hum.MoveDirection.Magnitude > 0 then
+                        chr:TranslateBy(hum.MoveDirection)
                     end
                 end
-                return nil
+            end)
+        end
+    else
+        tpwalking = false
+    end
+end
+
+local HideEnabled, LastCFrame
+local function EnableInvisible(state)
+    HideEnabled = state
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+
+    if not state then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = LastCFrame
+        end
+        LastCFrame = nil
+        return
+    end
+
+    local heartbeatConn
+    heartbeatConn = RunService.Heartbeat:Connect(function()
+        if not HideEnabled then heartbeatConn:Disconnect() return end
+        if LocalPlayer.Character then
+            local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+            if HumanoidRootPart then
+                local Offset = HumanoidRootPart.CFrame * CFrame.new(9e9, 0, 9e9)
+                LastCFrame = HumanoidRootPart.CFrame
+                HumanoidRootPart.CFrame = Offset
+                RunService.RenderStepped:Wait()
+                HumanoidRootPart.CFrame = LastCFrame
             end
+        end
+    end)
 
-            local storages = {
-                game:GetService("ReplicatedStorage"),
-                game:GetService("ServerStorage"),
-                game:GetService("Workspace")
-            }
+    local HookMethod
+    HookMethod = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        if not checkcaller() and key == "CFrame" and HideEnabled and 
+           LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+           LocalPlayer.Character:FindFirstChild("Humanoid") and 
+           LocalPlayer.Character.Humanoid.Health > 0 then
+            if self == LocalPlayer.Character.HumanoidRootPart and LastCFrame then
+                return LastCFrame
+            end
+        end
+        return HookMethod(self, key)
+    end))
+end
 
-            for _, storage in ipairs(storages) do
-                local found = findItem(storage)
-                if found then
-                    local clone = found:Clone()
-                    clone.Parent = char
-                    Rayfield:Notify({
-                        Title = translations[language].respawnItem,
-                        Content = "Item '" .. itemName .. "' added to character.",
-                        Duration = 3
-                    })
-                    return
+local function EnableFly(state)
+    getgenv().flyEnabled = state
+    local speeds = getgenv().Psalms.Tech.speedvalue
+    local speaker = game:GetService("Players").LocalPlayer
+    local chr = speaker.Character
+    local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+    local nowe = false
+    local tpwalking = false
+    local rsConn = nil
+    local flyLoopConn = nil
+
+    if state then
+        nowe = true
+        for i = 1, speeds do
+            spawn(function()
+                local RunService = game:GetService("RunService")
+                local hb = RunService.Heartbeat
+                local chr = speaker.Character
+                local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+                tpwalking = true
+                while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+                    if hum.MoveDirection.Magnitude > 0 then
+                        chr:TranslateBy(hum.MoveDirection)
+                    end
                 end
-            end
+            end)
+        end
+        speaker.Character.Animate.Disabled = true
+        local Char = speaker.Character
+        local Hum = Char:FindFirstChildOfClass("Humanoid") or Char:FindFirstChildOfClass("AnimationController")
+        for i, v in next, Hum:GetPlayingAnimationTracks() do
+            v:AdjustSpeed(0)
+        end
+        local humanoid = speaker.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, false)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+            humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+        end
 
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = "Item '" .. itemName .. "' not found.",
-                Duration = 3
-            })
+        if humanoid and humanoid.RigType = Enum.HumanoidRigType.R6 then
+            local plr = game.Players.LocalPlayer
+            local torso = plr.Character.Torso
+            local ctrl, lastctrl = {f = 0, b = 0, l = 0, r = 0}, {f = 0, b = 0, l = 0, r = 0}
+            local maxspeed = 50
+            local speed = 0
+            local bg = Instance.new("BodyGyro", torso)
+            bg.P = 9e4
+            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.cframe = torso.CFrame
+            local bv = Instance.new("BodyVelocity", torso)
+            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            plr.Character.Humanoid.PlatformStand = true
+            rsConn = game:GetService("RunService").RenderStepped:Connect(function()
+                if not nowe then rsConn:Disconnect() return end
+                if plr.Character.Humanoid.Health == 0 then return end
+                if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+                    speed = speed + 0.5 + (speed / maxspeed)
+                    if speed > maxspeed then speed = maxspeed end
+                elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
+                    speed = speed - 1
+                    if speed < 0 then speed = 0 end
+                end
+                if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+                    lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+                elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
+                    bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+                else
+                    bv.velocity = Vector3.new(0, 0, 0)
+                end
+                bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
+            end)
         else
-            Rayfield:Notify({
-                Title = translations[language].error,
-                Content = "يرجى كتابة اسم الأداة / Please enter item name",
-                Duration = 3
-            })
+            local plr = game.Players.LocalPlayer
+            local UpperTorso = plr.Character.UpperTorso
+            local ctrl, lastctrl = {f = 0, b = 0, l = 0, r = 0}, {f = 0, b = 0, l = 0, r = 0}
+            local maxspeed = 50
+            local speed = 0
+            local bg = Instance.new("BodyGyro", UpperTorso)
+            bg.P = 9e4
+            bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.cframe = UpperTorso.CFrame
+            local bv = Instance.new("BodyVelocity", UpperTorso)
+            bv.velocity = Vector3.new(0, 0.1, 0)
+            bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+            plr.Character.Humanoid.PlatformStand = true
+            flyLoopConn = spawn(function()
+                while nowe or game:GetService("Players").LocalPlayer.Character.Humanoid.Health == 0 do
+                    wait()
+                    if not nowe then break end
+                    if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+                        speed = speed + 0.5 + (speed / maxspeed)
+                        if speed > maxspeed then speed = maxspeed end
+                    elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
+                        speed = speed - 1
+                        if speed < 0 then speed = 0 end
+                    end
+                    if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+                        lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+                    elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
+                        bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+                    else
+                        bv.velocity = Vector3.new(0, 0, 0)
+                    end
+                    bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
+                end
+                ctrl = {f = 0, b = 0, l = 0, r = 0}
+                lastctrl = {f = 0, b = 0, l = 0, r = 0}
+                speed = 0
+                if bg then bg:Destroy() end
+                if bv then bv:Destroy() end
+                if plr.Character and plr.Character:FindFirstChild("Humanoid") then
+                    plr.Character.Humanoid.PlatformStand = false
+                end
+                game.Players.LocalPlayer.Character.Animate.Disabled = false
+                tpwalking = false
+            end)
+        end
+    else
+        nowe = false
+        tpwalking = false
+        if rsConn then rsConn:Disconnect() rsConn = nil end
+        if flyLoopConn then coroutine.close(flyLoopConn) flyLoopConn = nil end
+        local humanoid = speaker.Character and speaker.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, true)
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+            humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+            humanoid.PlatformStand = false
+        end
+        if speaker.Character and speaker.Character:FindFirstChild("UpperTorso") then
+            local UpperTorso = speaker.Character.UpperTorso
+            local bg = UpperTorso:FindFirstChild("BodyGyro")
+            local bv = UpperTorso:FindFirstChild("BodyVelocity")
+            if bg then bg:Destroy() end
+            if bv then bv:Destroy() end
+        end
+        if speaker.Character and speaker.Character:FindFirstChild("Torso") then
+            local torso = speaker.Character.Torso
+            local bg = torso:FindFirstChild("BodyGyro")
+            local bv = torso:FindFirstChild("BodyVelocity")
+            if bg then bg:Destroy() end
+            if bv then bv:Destroy() end
+        end
+        speaker.Character.Animate.Disabled = false
+    end
+end
+
+local speedEnabled, invisibleEnabled, flyEnabled = false, false, false
+getgenv().flyEnabled = false
+
+local speedBtn = Instance.new("TextButton")
+speedBtn.Size = UDim2.new(0.8, 0, 0, 60)
+speedBtn.Position = UDim2.new(0.1, 0, 0.1, 0)
+speedBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+speedBtn.Text = "Speed: OFF"
+speedBtn.TextColor3 = Color3.new(1,1,1)
+speedBtn.TextSize = 30
+speedBtn.Font = Enum.Font.GothamBold
+speedBtn.Parent = playerContent
+Instance.new("UICorner", speedBtn).CornerRadius = UDim.new(0, 14)
+
+speedBtn.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    EnableCFrameSpeed(speedEnabled)
+    speedBtn.Text = "Speed: " .. (speedEnabled and "ON" or "OFF")
+    speedBtn.BackgroundColor3 = speedEnabled and Color3.fromRGB(62, 39, 78) or Color3.fromRGB(102, 65, 129)
+end)
+
+local invisibleBtn = Instance.new("TextButton")
+invisibleBtn.Size = UDim2.new(0.8, 0, 0, 60)
+invisibleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+invisibleBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+invisibleBtn.Text = "Invisible: OFF"
+invisibleBtn.TextColor3 = Color3.new(1,1,1)
+invisibleBtn.TextSize = 30
+invisibleBtn.Font = Enum.Font.GothamBold
+invisibleBtn.Parent = playerContent
+Instance.new("UICorner", invisibleBtn).CornerRadius = UDim.new(0, 14)
+
+invisibleBtn.MouseButton1Click:Connect(function()
+    invisibleEnabled = not invisibleEnabled
+    EnableInvisible(invisibleEnabled)
+    invisibleBtn.Text = "Invisible: " .. (invisibleEnabled and "ON" or "OFF")
+    invisibleBtn.BackgroundColor3 = invisibleEnabled and Color3.fromRGB(62, 39, 78) or Color3.fromRGB(102, 65, 129)
+end)
+
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0.8, 0, 0, 60)
+flyBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+flyBtn.BackgroundColor3 = Color3.fromRGB(102, 65, 129)
+flyBtn.Text = "Fly: OFF"
+flyBtn.TextColor3 = Color3.new(1,1,1)
+flyBtn.TextSize = 30
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.Parent = playerContent
+Instance.new("UICorner", flyBtn).CornerRadius = UDim.new(0, 14)
+
+flyBtn.MouseButton1Click:Connect(function()
+    flyEnabled = not flyEnabled
+    EnableFly(flyEnabled)
+    flyBtn.Text = "Fly: " .. (flyEnabled and "ON" or "OFF")
+    flyBtn.BackgroundColor3 = flyEnabled and Color3.fromRGB(62, 39, 78) or Color3.fromRGB(102, 65, 129)
+end)
+
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(0.8, 0, 0, 50)
+speedInput.Position = UDim2.new(0.1, 0, 0.7, 0)
+speedInput.BackgroundColor3 = Color3.fromRGB(52, 50, 82)
+speedInput.Text = tostring(getgenv().Psalms.Tech.speedvalue)
+speedInput.TextColor3 = Color3.new(1,1,1)
+speedInput.TextSize = 28
+speedInput.Font = Enum.Font.GothamBold
+speedInput.PlaceholderText = "Speed (0-10)"
+speedInput.Parent = playerContent
+Instance.new("UICorner", speedInput).CornerRadius = UDim.new(0, 14)
+
+speedInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        UpdateSpeedValue(speedInput.Text)
+        speedInput.Text = tostring(getgenv().Psalms.Tech.speedvalue)
+    end
+end)
+
+game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(char)
+    wait(0.7)
+    if game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+        game.Players.LocalPlayer.Character.Humanoid.PlatformStand = false
+        game.Players.LocalPlayer.Character.Animate.Disabled = false
+    end
+end)
+
+-- ===================================
+-- دالة مشتركة للدروب (Min / Max / Booking)
+-- ===================================
+local function RunDrop(dropCFrame, camDropPos, armoryPos)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    local oldCamType = camera.CameraType
+    local oldCamSubject = camera.CameraSubject
+    local oldFOV = camera.FieldOfView
+    local camConnection
+
+    -- تفعيل فتح الأبواب عند بداية الدروب
+    getgenv().AllCellPartsOpen = true
+
+    local function FixCamera()
+        if camConnection then camConnection:Disconnect() end
+        camera.CameraType = Enum.CameraType.Scriptable
+        camera.FieldOfView = 120
+        camConnection = RunService.RenderStepped:Connect(function()
+            camera.CFrame = camDropPos
+        end)
+    end
+
+    local restoreConn = player.CharacterAdded:Once(function()
+        if camConnection then camConnection:Disconnect() end
+        camera.CameraType = oldCamType
+        camera.CameraSubject = oldCamSubject
+        camera.FieldOfView = oldFOV
+        getgenv().AllCellPartsOpen = false
+    end)
+
+    FixCamera()
+    hrp.CFrame = armoryPos
+    task.wait(0.4)
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") then
+            task.spawn(function()
+                fireproximityprompt(v)
+            end)
         end
     end
-})
+    task.wait(1.1)
+    hrp.CFrame = dropCFrame
+
+    local posFix = RunService.Heartbeat:Connect(function()
+        hrp.CFrame = dropCFrame
+        hrp.Velocity = Vector3.new(0, 0, 0)
+        hrp.RotVelocity = Vector3.new(0, 0, 0)
+    end)
+
+    task.wait(0.4)
+    for _, tool in ipairs(player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            tool.Parent = char
+            task.wait(0.25)
+            for _, obj in ipairs(tool:GetDescendants()) do
+                if obj:IsA("RemoteEvent") and (string.find(string.lower(obj.Name), "drop") or string.find(string.lower(obj.Name), "send") or string.find(string.lower(obj.Name), "key")) then
+                    obj:FireServer()
+                    break
+                end
+            end
+            task.wait(0.35)
+        end
+    end
+
+    if posFix then posFix:Disconnect() end
+
+    hrp.CFrame = FinalFarmPos
+    task.wait(0.5)
+    hum:ChangeState(Enum.HumanoidStateType.Dead)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "سرقة + نقل جديد + ريسبون ✅";
+        Text = "الأسلحة دروب وانتقلت لـ X:20.06 Y:11.23 Z:-117.39 قبل الريسبون 🔥";
+        Duration = 8;
+    })
+end
+
+local function RunMin() RunDrop(MinDropCFrame, MinCamDropPos, MinArmoryPos) end
+local function RunMax() RunDrop(MaxDropCFrame, MaxCamDropPos, MaxArmoryPos) end
+local function RunBooking() RunDrop(BookingDropCFrame, BookingCamDropPos, MaxArmoryPos) end
+
+-- تنفيذ الـ Spawn
+local function executeSelected(tabType)
+    if tabType == "Locations" then
+        if selectedLocation == "Min" then
+            RunMin()
+        elseif selectedLocation == "Max" then
+            RunMax()
+        elseif selectedLocation == "Booking" then
+            RunBooking()
+        end
+    elseif tabType == "Players" then
+        if selectedPlayer then
+            local targetPos = selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") and selectedPlayer.Character.HumanoidRootPart.Position or FinalFarmPos.Position
+            RunMin(targetPos)
+        end
+    end
+end
+
+local function startLoadingAnimation(dot)
+    dot.Visible = true
+    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true)
+    local tween = TweenService:Create(dot, tweenInfo, {Transparency = 1})
+    tween:Play()
+    return tween
+end
+
+local function startCooldown(tabType)
+    local dot, btn
+    if tabType == "Locations" then
+        isOnCooldownLocations = true
+        dot = locLoadingDot
+        btn = locSpawnBtn
+    elseif tabType == "Players" then
+        isOnCooldownPlayers = true
+        dot = playersLoadingDot
+        btn = playersSpawnBtn
+    end
+    local tween = startLoadingAnimation(dot)
+    task.wait(cooldownTime)
+    tween:Cancel()
+    dot.Transparency = 0
+    dot.Visible = false
+    if tabType == "Locations" then
+        isOnCooldownLocations = false
+    elseif tabType == "Players" then
+        isOnCooldownPlayers = false
+    end
+end
+
+locSpawnBtn.MouseButton1Click:Connect(function()
+    if not isOnCooldownLocations and selectedLocation then
+        task.spawn(executeSelected, "Locations")
+        task.spawn(startCooldown, "Locations")
+    end
+end)
+
+playersSpawnBtn.MouseButton1Click:Connect(function()
+    if not isOnCooldownPlayers and selectedPlayer then
+        task.spawn(executeSelected, "Players")
+        task.spawn(startCooldown, "Players")
+    end
+end)
+
+-- ===================================
+-- تفعيل عملية الspawn تلقائيًا بعد الحقن (افتراضيًا لـ Min)
+-- ===================================
+selectedLocation = "Min"  -- اختيار افتراضي لـ Min
+task.delay(0.5, function()  -- تأخير خفيف للانتظار حتى يتم الحقن الكامل
+    executeSelected("Locations")
+end)
